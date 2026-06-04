@@ -1,0 +1,62 @@
+{
+  "manifest_version": 3,
+  "name": "VibeX Academy - Lovable Extension",
+   "version": "6.0.13",
+  "description": "Premium extension with license validation, plan mode, and smart automation.",
+  "permissions": ["storage", "activeTab", "scripting", "tabs", "sidePanel", "cookies"],
+  "host_permissions": [
+    "https://*.lovable.dev/*",
+    "https://api.lovable.dev/*",
+    "https://lovable.dev/*",
+    "https://lovable-api.com/*",
+    "https://echnvnfamojrwdemcjmu.supabase.co/*",
+    "https://ynvrijkuampxpsmshftm.supabase.co/*",
+    "https://storage.googleapis.com/*"
+  ],
+  "icons": {
+    "16": "images/icon16.png",
+    "48": "images/icon48.png",
+    "128": "images/icon128.png"
+  },
+  "action": {
+    "default_title": "VibeX Academy - Lovable Extension",
+    "default_icon": {
+      "16": "images/icon16.png",
+      "48": "images/icon48.png",
+      "128": "images/icon128.png"
+    }
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [{
+    "matches": [
+      "https://*.lovable.dev/*",
+      "https://lovable.dev/*",
+      "https://api.lovable.dev/*"
+    ],
+    "js": ["jszip.min.js", "hwFingerprint.js", "sounds.js", "content-templates.js", "content.js"],
+    "css": ["floating.css"],
+    "run_at": "document_start"
+  }],
+  "web_accessible_resources": [{
+    "resources": [
+      "pageHook.js",
+      "sounds/error-payment.mp3",
+      "sounds/error-ratelimit.mp3",
+      "sounds/error-token.mp3",
+      "images/logo_glow.jpg",
+      "images/logo_full_dark.png",
+      "images/logo_circle_white.png",
+      "images/logo_circle_tight.png",
+      "images/logo_lc_tight.png",
+      "images/icon16.png",
+      "images/icon48.png",
+      "images/icon128.png",
+      "images/logo_full_white.png",
+      "images/logo_vertical_white.png"
+    ],
+    "matches": ["https://*.lovable.dev/*", "https://lovable.dev/*"]
+  }]
+}
