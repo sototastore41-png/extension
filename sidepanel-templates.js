@@ -1,5 +1,5 @@
 // ============================================================
-// VibeX Academy - Lovable Extension - Side Panel Templates (Static/HTML)
+// TechVai - Lovable Extension - Side Panel Templates (Static/HTML)
 // Separado da logica de negocio para facilitar manutencao
 // ============================================================
 
@@ -46,7 +46,7 @@ function spSanitizeUrl(url) {
 
 function spTemplateLicenseGate() {
   return '<div class="sp-license-gate">' +
-    '<div class="sp-logo-container" style="text-align:center;margin:6px auto 24px;display:flex;justify-content:center;"><img src="images/logo_circle_tight.png" style="width:170px;height:158px;object-fit:contain;display:block;filter:drop-shadow(0 0 22px rgba(168,85,247,0.32));" alt="VibeX Academy - Lovable Extension Logo"></div>' +
+    '<div class="sp-logo-container" style="text-align:center;margin:6px auto 24px;display:flex;justify-content:center;"><img src="images/logo_circle_tight.png" style="width:170px;height:158px;object-fit:contain;display:block;filter:drop-shadow(0 0 22px rgba(168,85,247,0.32));" alt="TechVai - Lovable Extension Logo"></div>' +
     '<p class="sp-gate-title">Activate License</p>' +
     '<p class="sp-gate-desc">Enter your license key to unlock.</p>' +
     '<input class="sp-input" id="sp-license-input" placeholder="QL-XXXXXXXXXXXXXXXXXXXX" spellcheck="false">' +

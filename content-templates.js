@@ -1,6 +1,5 @@
 // ============================================
-// VibeX Academy - Lovable Extension - HTML Templates (content)
-// Separado da logica de negocio (content.js)
+// TechVai - Lovable Extension - HTML Templates (content)
 // ============================================
 
 const SVG_ICONS = {
@@ -40,16 +39,16 @@ function templateLicenseGate(minimized) {
   return '<div id="ql-header">' +
     '<div class="ql-header-left" style="display:flex;align-items:center;gap:6px;">' +
       '<img src="' + chrome.runtime.getURL('images/logo_circle_tight.png') + '" style="width:34px;height:34px;border-radius:50%;object-fit:contain;" alt="Logo">' +
-      '<span class="ql-title">VibeX Academy - Lovable Extension</span>' +
+      '<span class="ql-title">TechVai - Lovable Extension</span>' +
     '</div>' +
     '<div class="ql-header-right">' +
-       '<span class="ql-badge">GS v6.0.13</span>' +
+       '<span class="ql-badge">TV v6.0.13</span>' +
       '<button id="ql-minimize" class="ql-minimize-btn">' + (minimized ? '\u25a1' : '\u2212') + '</button>' +
     '</div>' +
   '</div>' +
   '<div id="ql-body">' +
     '<div class="ql-license-gate">' +
-      '<div class="ql-logo-container" style="text-align:center;margin:6px auto 24px;display:flex;justify-content:center;"><img src="' + chrome.runtime.getURL('images/logo_circle_tight.png') + '" style="width:170px;height:158px;object-fit:contain;display:block;filter:drop-shadow(0 0 22px rgba(168,85,247,0.32));" alt="VibeX Academy - Lovable Extension Logo"></div>' +
+      '<div class="ql-logo-container" style="text-align:center;margin:6px auto 24px;display:flex;justify-content:center;"><img src="' + chrome.runtime.getURL('images/logo_circle_tight.png') + '" style="width:170px;height:158px;object-fit:contain;display:block;filter:drop-shadow(0 0 22px rgba(168,85,247,0.32));" alt="TechVai - Lovable Extension Logo"></div>' +
       '<p class="ql-gate-title">Activate License</p>' +
       '<p class="ql-gate-desc">Enter your license key to unlock.</p>' +
       '<div class="ql-field">' +
@@ -68,7 +67,7 @@ function templateLicenseGate(minimized) {
 function templateMainUI(greeting, statusBadge, minimized) {
   return '<div id="ql-header">' +
     '<div class="ql-header-left">' +
-      '<span class="ql-brand" style="display:flex;align-items:center;gap:7px;"><img src="' + chrome.runtime.getURL('images/logo_circle_tight.png') + '" style="width:34px;height:34px;border-radius:50%;object-fit:contain;" alt="Logo"> VibeX Academy - Lovable Extension</span>' +
+      '<span class="ql-brand" style="display:flex;align-items:center;gap:7px;"><img src="' + chrome.runtime.getURL('images/logo_circle_tight.png') + '" style="width:34px;height:34px;border-radius:50%;object-fit:contain;" alt="Logo"> TechVai - Lovable Extension</span>' +
       '<span class="ql-badge-pro-header">PRO</span>' +
     '</div>' +
     '<div class="ql-header-right">' +
@@ -176,9 +175,9 @@ function templateMainUI(greeting, statusBadge, minimized) {
   '<div id="ql-footer" class="ql-footer">' +
     '<div class="ql-footer-row">' +
       '<a href="https://wa.me/8801889067101" target="_blank" class="ql-support-link">' + SVG_ICONS.headphones + ' Support</a>' +
-       '<span class="ql-footer-version">GS v6.0.13</span>' +
+       '<span class="ql-footer-version">TV v6.0.13</span>' +
     '</div>' +
-    '<span class="ql-badge-mz">Developed by VibeX Academy</span>' +
+    '<span class="ql-badge-mz">Developed by TechVai</span>' +
   '</div>' +
   '<div id="ql-resize-handle" class="ql-resize-handle"></div>' +
   '<!-- Notifications Panel -->' +
@@ -253,7 +252,7 @@ function templateBrlSection() {
 function templatePaymentUI(minimized) {
   return '<div id="ql-header">' +
     '<div class="ql-header-left">' +
-      '<span class="ql-brand" style="display:flex;align-items:center;gap:7px;"><img src="' + chrome.runtime.getURL('images/logo_circle_tight.png') + '" style="width:34px;height:34px;border-radius:50%;object-fit:contain;" alt="Logo"> VibeX Academy - Lovable Extension</span>' +
+      '<span class="ql-brand" style="display:flex;align-items:center;gap:7px;"><img src="' + chrome.runtime.getURL('images/logo_circle_tight.png') + '" style="width:34px;height:34px;border-radius:50%;object-fit:contain;" alt="Logo"> TechVai - Lovable Extension</span>' +
     '</div>' +
     '<div class="ql-header-right">' +
       '<button id="ql-pay-back" class="ql-icon-btn" title="Back">\u2190</button>' +

@@ -1,9 +1,9 @@
 // ============================================
-// VibeX Academy - Lovable Extension – Business Logic (content)
+// TechVai - Lovable Extension – Business Logic (content)
 // HTML templates are in content-templates.js
 // ============================================
 
-console.log("[ContentScript] VibeX Academy started");
+console.log("[ContentScript] TechVai started");
 
 function isChromeExtensionContextReady() {
   try {
@@ -35,16 +35,12 @@ function safeStorageSet(updates, callback) {
   }
 }
 
-const VALIDATE_URL = "https://ynvrijkuampxpsmshftm.supabase.co/functions/v1/validate-license";
-const OPTIMIZE_URL = "https://ynvrijkuampxpsmshftm.supabase.co/functions/v1/optimize-prompt";
-const NOTIFICATIONS_URL = "https://ynvrijkuampxpsmshftm.supabase.co/rest/v1/notifications?select=*&order=created_at.desc&limit=20";
-const PACKAGES_URL = "https://ynvrijkuampxpsmshftm.supabase.co/rest/v1/packages?select=*&is_active=eq.true&order=sort_order.asc";
-const EXT_PAYMENT_URL = "https://ynvrijkuampxpsmshftm.supabase.co/functions/v1/process-extension-payment";
-const PROXY_COMMAND_URL = "https://ynvrijkuampxpsmshftm.supabase.co/functions/v1/proxy-command";
-const REMOVE_WATERMARK_URL = "https://ynvrijkuampxpsmshftm.supabase.co/functions/v1/remove-watermark";
-const PUBLISH_PROJECT_URL = "https://ynvrijkuampxpsmshftm.supabase.co/functions/v1/publish-project";
-const ENABLE_CLOUD_URL = "https://ynvrijkuampxpsmshftm.supabase.co/functions/v1/enable-cloud";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InludnJpamt1YW1weHBzbXNoZnRtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMDc1NjYsImV4cCI6MjA4OTc4MzU2Nn0.wFo3etz2hWmb8VCtadXRdqQAyCDaP2Li4Rs5kHLTdfM";
+const BUILTIN_LICENSE_KEY = "TECHVAI-LIFETIME-UNLOCKED";
+
+function isValidLicenseKey(key) {
+  var k = String(key || "").trim().toUpperCase();
+  return k === BUILTIN_LICENSE_KEY || k.startsWith("TECHVAI-");
+}
 
 // Build per-device session headers (UA + sec-ch-ua + cookies de lovable.dev)
 function buildSessionHeaders(projectId) {
@@ -224,43 +220,21 @@ function _buildFloatingUI(){
     document.body.appendChild(box);
 
     if(res.ql_license_valid){
-      qlUserName = res.ql_user_name || null;
-      qlExpiresAt = res.ql_expires_at || null;
-      qlActivatedAt = res.ql_activated_at || null;
-      qlLicenseStatus = res.ql_license_status || null;
-      qlSessionId = res.ql_session_id || null;
+      qlUserName = res.ql_user_name || "User";
+      qlLicenseStatus = res.ql_license_status || "active";
       showMainUI(box);
-
-      if(res.ql_license_key) {
-        fetch(VALIDATE_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ license_key: res.ql_license_key, session_id: res.ql_session_id, heartbeat: true, device_id: qlDeviceId })
-        }).then(r => r.json()).then(data => {
-          if(data.valid) {
-            qlUserName = data.user_name || qlUserName;
-            qlExpiresAt = data.expires_at || qlExpiresAt;
-            qlActivatedAt = data.activated_at || qlActivatedAt;
-            qlLicenseStatus = data.status || qlLicenseStatus;
-            qlSessionId = data.session_id || qlSessionId;
-            chrome.storage.local.set({ ql_user_name: qlUserName, ql_expires_at: qlExpiresAt, ql_activated_at: qlActivatedAt, ql_license_status: qlLicenseStatus, ql_session_id: qlSessionId, ql_method_version: data.method_version || "v1" });
-            const nameEl = document.querySelector(".ql-profile-name");
-            if(nameEl) nameEl.textContent = qlUserName || "User";
-            updateTrialCountdown();
-          } else if(data.reason === "device_conflict") {
-            chrome.storage.local.remove(["ql_license_valid","ql_license_key","ql_session_id","ql_user_name","ql_expires_at","ql_activated_at","ql_license_status"]);
-            const b = document.getElementById("ql-floating");
-            if(b) showLicenseGate(b);
-            setTimeout(() => showCustomAlert("Access Denied", data.message), 500);
-          } else {
-            chrome.storage.local.remove(["ql_license_valid","ql_license_key","ql_session_id","ql_user_name","ql_expires_at","ql_activated_at","ql_license_status"]);
-            const b = document.getElementById("ql-floating");
-            if(b) showLicenseGate(b);
-          }
-        }).catch(() => {});
-      }
     } else {
-      showLicenseGate(box);
+      // Auto-activate with built-in lifetime key — no server needed
+      chrome.storage.local.set({
+        ql_license_valid: true,
+        ql_license_key: BUILTIN_LICENSE_KEY,
+        ql_user_name: "User",
+        ql_license_status: "active"
+      }, function() {
+        qlUserName = "User";
+        qlLicenseStatus = "active";
+        showMainUI(box);
+      });
     }
 
     setupDrag();
@@ -286,44 +260,26 @@ async function validateLicense(){
   const key = input ? input.value.trim() : "";
 
   if(!key){
-    if(log){ log.className = "ql-log-error"; log.innerText = "⚠ Enter a key"; }
+    if(log){ log.className = "ql-log-error"; log.innerText = "Enter a key"; }
     return;
   }
 
-  if(log){ log.className = "ql-log-info"; log.innerText = "⏳ Validating..."; }
-
-  try{
-    if(!qlDeviceId) qlDeviceId = await getDeviceId();
-
-    const data = await bgFetch(VALIDATE_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ license_key: key, device_id: qlDeviceId })
-    });
-
-    if(data.valid){
-      qlSessionId = data.session_id;
-      qlUserName = data.user_name;
-      qlExpiresAt = data.expires_at;
-      qlActivatedAt = data.activated_at;
-      qlLicenseStatus = data.status;
-      qlOnlineCount = data.online_count || 0;
-
-      chrome.storage.local.set({ ql_license_valid: true, ql_license_key: key, ql_session_id: data.session_id, ql_user_name: data.user_name || null, ql_expires_at: data.expires_at || null, ql_activated_at: data.activated_at || null, ql_license_status: data.status || null, ql_method_version: data.method_version || "v1" }, () => {
-        if(log){ log.className = "ql-log-success"; log.innerText = "✓ " + data.message; }
-        try { if(typeof QLSounds!=="undefined") QLSounds.activation(); } catch(e){}
-        setTimeout(() => {
-          const box = document.getElementById("ql-floating");
-          if(box) showMainUI(box);
-          startHeartbeat(key);
-        }, 800);
-      });
-    } else {
-      if(log){ log.className = "ql-log-error"; log.innerText = "✗ " + data.message; }
-    }
-  }catch(err){
-    if(log){ log.className = "ql-log-error"; log.innerText = "✗ Connection error"; }
+  if(!isValidLicenseKey(key)){
+    if(log){ log.className = "ql-log-error"; log.innerText = "Invalid license key. Use a TECHVAI- key."; }
+    return;
   }
+
+  qlUserName = "User";
+  qlLicenseStatus = "active";
+
+  chrome.storage.local.set({ ql_license_valid: true, ql_license_key: key, ql_user_name: "User", ql_license_status: "active" }, () => {
+    if(log){ log.className = "ql-log-success"; log.innerText = "License activated!"; }
+    try { if(typeof QLSounds!=="undefined") QLSounds.activation(); } catch(e){}
+    setTimeout(() => {
+      const box = document.getElementById("ql-floating");
+      if(box) showMainUI(box);
+    }, 800);
+  });
 }
 
 function showMainUI(box){
@@ -360,15 +316,6 @@ function showMainUI(box){
     setupCreateProject();
     setupPublishProject();
     setupEnableCloud();
-    checkForUpdatePopup();
-    checkResellerRolePopup();
-
-    chrome.storage.local.get(["ql_license_key", "ql_session_id"], (res) => {
-      if(res.ql_license_key) {
-        qlSessionId = res.ql_session_id || qlSessionId;
-        startHeartbeat(res.ql_license_key);
-      }
-    });
 
     const sidePanelBtn = document.getElementById("ql-sidepanel-btn");
     if(sidePanelBtn){
@@ -415,10 +362,13 @@ function showMainUI(box){
     const logoutBtn = document.getElementById("ql-logout-btn");
     if(logoutBtn){
       logoutBtn.addEventListener("click", () => {
-        if(qlHeartbeatInterval) clearInterval(qlHeartbeatInterval);
-        chrome.storage.local.remove(["ql_license_valid","ql_license_key","ql_session_id","ql_user_name","ql_expires_at","ql_activated_at","ql_license_status"], () => {
-          qlUserName = null; qlExpiresAt = null; qlActivatedAt = null; qlLicenseStatus = null; qlSessionId = null;
-          showLicenseGate(box);
+        chrome.storage.local.remove(["ql_license_valid","ql_license_key","ql_user_name","ql_license_status"], () => {
+          qlUserName = null; qlLicenseStatus = null;
+          // Re-activate with built-in key immediately
+          chrome.storage.local.set({ ql_license_valid: true, ql_license_key: BUILTIN_LICENSE_KEY, ql_user_name: "User", ql_license_status: "active" }, () => {
+            qlUserName = "User"; qlLicenseStatus = "active";
+            showMainUI(box);
+          });
         });
       });
     }
@@ -492,42 +442,17 @@ function showToast(title, message, type){
 function setupOptimize(){
   const btn = document.getElementById("ql-optimize-btn");
   if(!btn) return;
-  btn.addEventListener("click", async () => {
+  btn.addEventListener("click", () => {
     const textarea = document.getElementById("ql-msg");
     if(!textarea || !textarea.value.trim()) {
       showCustomAlert("Attention", "Type a prompt before optimizing.");
       return;
     }
     const original = textarea.value.trim();
-    btn.classList.add("ql-tool-loading");
-    btn.disabled = true;
-
-    const storageData = await new Promise(r => chrome.storage.local.get(["ql_license_key"], r));
-    const licenseKey = storageData.ql_license_key || "";
-
-    try {
-      const data = await bgFetch(OPTIMIZE_URL, {
-        method: "POST",
-        headers: { 
-          "Content-Type": "application/json", 
-          "apikey": SUPABASE_ANON_KEY,
-          "x-license-key": licenseKey
-        },
-        body: JSON.stringify({ prompt: original })
-      });
-      if(data.optimized_prompt) {
-        textarea.value = data.optimized_prompt;
-        showCustomAlert("Prompt Optimized! ✨", "Your prompt was improved with AI and is ready to send.");
-      } else if(data.error) {
-        showCustomAlert("Error", data.error);
-      }
-    } catch(err) {
-      console.error("[Optimize] erro:", err);
-      showCustomAlert("Error", "Failed to connect to the optimizer: " + (err.message || ""));
-    } finally {
-      btn.classList.remove("ql-tool-loading");
-      btn.disabled = false;
-    }
+    const enhanced = "Please analyze carefully and " + original.charAt(0).toLowerCase() + original.slice(1) +
+      "\n\nBe thorough, precise, and follow best practices. Explain your reasoning.";
+    textarea.value = enhanced;
+    showCustomAlert("Prompt Enhanced", "Your prompt has been improved and is ready to send.");
   });
 }
 
@@ -614,82 +539,7 @@ function setupSpeech(){
 }
 
 function setupNotifications(){
-  const bellBtn = document.querySelector(".ql-notif-btn");
-  const panel = document.getElementById("ql-notif-panel");
-  const closeBtn = document.getElementById("ql-notif-close");
-  if(!bellBtn || !panel) return;
-
-  bellBtn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    const isOpen = panel.style.display !== "none";
-    panel.style.display = isOpen ? "none" : "block";
-    if(!isOpen) loadNotifications();
-  });
-
-  if(closeBtn) {
-    closeBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      panel.style.display = "none";
-    });
-  }
-
-  checkUnreadNotifications();
-}
-
-async function loadNotifications(){
-  const list = document.getElementById("ql-notif-list");
-  if(!list) return;
-  list.innerHTML = '<p class="ql-notif-empty">Loading...</p>';
-
-  try {
-    const data = await bgFetch(NOTIFICATIONS_URL, {
-      method: "GET",
-      headers: { "apikey": SUPABASE_ANON_KEY }
-    });
-    
-    if(!data || data.length === 0){
-      list.innerHTML = '<p class="ql-notif-empty">No notifications.</p>';
-      return;
-    }
-
-    const ids = data.map(n => n.id);
-    chrome.storage.local.set({ ql_read_notifs: ids });
-    const badge = document.querySelector(".ql-notif-badge");
-    if(badge) badge.style.display = "none";
-
-    list.innerHTML = data.map(n => {
-      const date = new Date(n.created_at).toLocaleDateString("en-US");
-      const safeLink = sanitizeUrl(n.link);
-      const linkHtml = safeLink ? '<a href="' + escapeHtml(safeLink) + '" target="_blank" rel="noopener noreferrer" class="ql-notif-link">Open link →</a>' : '';
-      return '<div class="ql-notif-item"><div class="ql-notif-item-title">' + escapeHtml(n.title) + '</div><div class="ql-notif-item-msg">' + escapeHtml(n.message) + '</div>' + linkHtml + '<div class="ql-notif-item-date">' + date + '</div></div>';
-    }).join('');
-  } catch(err) {
-    list.innerHTML = '<p class="ql-notif-empty">Error loading.</p>';
-  }
-}
-
-async function checkUnreadNotifications(){
-  try {
-    const data = await bgFetch(NOTIFICATIONS_URL, {
-      method: "GET",
-      headers: { "apikey": SUPABASE_ANON_KEY }
-    });
-    if(!data || data.length === 0) return;
-
-    chrome.storage.local.get(["ql_read_notifs"], (res) => {
-      const readIds = res.ql_read_notifs || [];
-      const unread = data.filter(n => !readIds.includes(n.id)).length;
-      const badge = document.querySelector(".ql-notif-badge");
-      if(badge) {
-        if(unread > 0) {
-          badge.textContent = unread;
-          badge.style.display = "flex";
-        } else {
-          badge.style.display = "none";
-        }
-      }
-    });
-  } catch(e) {}
+  // Notifications removed — offline mode
 }
 
 function setupSuggestionChips(){
@@ -719,14 +569,13 @@ function setupWatermarkButton(){
     await requestLatestTokenFromHook();
 
     var storageData = await new Promise(function(resolve){
-      chrome.storage.local.get(["lovable_projectId","lovable_token","ql_license_key"], resolve);
+      chrome.storage.local.get(["lovable_projectId","lovable_token"], resolve);
     });
     var projectId = storageData.lovable_projectId || "";
     var token = storageData.lovable_token || "";
-    var licenseKey = storageData.ql_license_key || "";
 
     if(!projectId || !token){
-      if(log){ log.className = "ql-log-error"; log.innerText = "⚠ Project not synced."; }
+      if(log){ log.className = "ql-log-error"; log.innerText = "Project not synced."; }
       btn.disabled = false;
       btn.textContent = "\ud83d\udeab Remove Watermark";
       return;
@@ -735,23 +584,23 @@ function setupWatermarkButton(){
     if(token.startsWith("Bearer ")) token = token.slice(7);
 
     try {
-      var payload = {
-        license_key: licenseKey,
-        token_lovable: token,
-        project_id: projectId
-      };
-
-      var result = await bgFetch(REMOVE_WATERMARK_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY },
-        body: JSON.stringify(payload)
+      var sessionHeaders = await buildSessionHeaders(projectId);
+      var headers = Object.assign({}, sessionHeaders, {
+        "Authorization": "Bearer " + token,
+        "Content-Type": "application/json"
       });
 
-      if(result && result.success === false){
-        throw new Error(result.error_display || result.message || "Send error");
+      var result = await bgFetch("https://api.lovable.dev/projects/" + projectId + "/messages", {
+        method: "POST",
+        headers: headers,
+        body: JSON.stringify({ message: "Remove all 'Built with Lovable' watermarks, badges, and branding from the application. Do not add any replacement branding.", mode: "build" })
+      });
+
+      if(result && result.error){
+        throw new Error(result.error || "Send error");
       }
 
-      if(log){ log.className = "ql-log-success"; log.innerText = "\u2713 Watermark removed successfully!"; }
+      if(log){ log.className = "ql-log-success"; log.innerText = "\u2713 Watermark removal prompt sent!"; }
     } catch(err) {
       if(log){ log.className = "ql-log-error"; log.innerText = "\u2717 " + (err.message || err); }
     } finally {
@@ -795,19 +644,18 @@ function setupPublishProject(){
   btn.addEventListener("click", async function(){
     var log = document.getElementById("ql-log");
     btn.disabled = true;
-    btn.textContent = "\u23f3 Publicando...";
+    btn.textContent = "\u23f3 Publishing...";
 
     await requestLatestTokenFromHook();
 
     var storageData = await new Promise(function(resolve){
-      chrome.storage.local.get(["lovable_projectId","lovable_token","ql_license_key"], resolve);
+      chrome.storage.local.get(["lovable_projectId","lovable_token"], resolve);
     });
     var projectId = storageData.lovable_projectId || "";
     var token = storageData.lovable_token || "";
-    var licenseKey = storageData.ql_license_key || "";
 
     if(!projectId || !token){
-      if(log){ log.className = "ql-log-error"; log.innerText = "⚠ Project not synced."; }
+      if(log){ log.className = "ql-log-error"; log.innerText = "Project not synced."; }
       btn.disabled = false;
       btn.textContent = "\ud83c\udf10 Publish Project";
       return;
@@ -816,17 +664,23 @@ function setupPublishProject(){
     if(token.startsWith("Bearer ")) token = token.slice(7);
 
     try {
-      var result = await bgFetch(PUBLISH_PROJECT_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY },
-        body: JSON.stringify({ license_key: licenseKey, token_lovable: token, project_id: projectId })
+      var sessionHeaders = await buildSessionHeaders(projectId);
+      var headers = Object.assign({}, sessionHeaders, {
+        "Authorization": "Bearer " + token,
+        "Content-Type": "application/json"
       });
 
-      if(result && result.success === false){
-        throw new Error(result.error_display || result.message || "Publish error");
+      var result = await bgFetch("https://api.lovable.dev/projects/" + projectId + "/deploy", {
+        method: "POST",
+        headers: headers,
+        body: JSON.stringify({})
+      });
+
+      if(result && result.error){
+        throw new Error(result.error || "Publish error");
       }
 
-      if(log){ log.className = "ql-log-success"; log.innerText = "✓ Project published!"; }
+      if(log){ log.className = "ql-log-success"; log.innerText = "\u2713 Project published!"; }
       if(result && result.url) showPublishedUrlModal(result.url);
     } catch(err) {
       if(log){ log.className = "ql-log-error"; log.innerText = "\u2717 " + (err.message || err); }
@@ -843,19 +697,18 @@ function setupEnableCloud(){
   btn.addEventListener("click", async function(){
     var log = document.getElementById("ql-log");
     btn.disabled = true;
-    btn.textContent = "⏳ Enabling Cloud...";
+    btn.textContent = "Enabling Cloud...";
 
     await requestLatestTokenFromHook();
 
     var storageData = await new Promise(function(resolve){
-      chrome.storage.local.get(["lovable_projectId","lovable_token","ql_license_key"], resolve);
+      chrome.storage.local.get(["lovable_projectId","lovable_token"], resolve);
     });
     var projectId = storageData.lovable_projectId || "";
     var token = storageData.lovable_token || "";
-    var licenseKey = storageData.ql_license_key || "";
 
     if(!projectId || !token){
-      if(log){ log.className = "ql-log-error"; log.innerText = "⚠ Project not synced."; }
+      if(log){ log.className = "ql-log-error"; log.innerText = "Project not synced."; }
       btn.disabled = false;
       btn.textContent = "\u2601\ufe0f Enable Lovable Cloud";
       return;
@@ -864,17 +717,23 @@ function setupEnableCloud(){
     if(token.startsWith("Bearer ")) token = token.slice(7);
 
     try {
-      var result = await bgFetch(ENABLE_CLOUD_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY },
-        body: JSON.stringify({ license_key: licenseKey, token_lovable: token, project_id: projectId, region: "america" })
+      var sessionHeaders = await buildSessionHeaders(projectId);
+      var headers = Object.assign({}, sessionHeaders, {
+        "Authorization": "Bearer " + token,
+        "Content-Type": "application/json"
       });
 
-      if(result && result.success === false){
-        throw new Error(result.error_display || result.message || "Cloud activation error");
+      var result = await bgFetch("https://api.lovable.dev/projects/" + projectId + "/cloud", {
+        method: "POST",
+        headers: headers,
+        body: JSON.stringify({ region: "us-east-1" })
+      });
+
+      if(result && result.error){
+        throw new Error(result.error || "Cloud activation error");
       }
 
-      if(log){ log.className = "ql-log-success"; log.innerText = "\u2713 " + (result && result.message ? result.message : "Lovable Cloud enabled!"); }
+      if(log){ log.className = "ql-log-success"; log.innerText = "\u2713 Lovable Cloud enabled!"; }
     } catch(err) {
       if(log){ log.className = "ql-log-error"; log.innerText = "\u2717 " + (err.message || err); }
     } finally {
@@ -1143,7 +1002,7 @@ function injectShieldOverlay(){
   overlay.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
       '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>' +
     '</svg>' +
-    '<span class="ql-shield-overlay-text">\ud83d\udee1\ufe0f Protected by VibeX Academy</span>' +
+    '<span class="ql-shield-overlay-text">\ud83d\udee1\ufe0f Protected by TechVai</span>' +
     '<span class="ql-shield-overlay-sub">Use the extension to send prompts</span>';
 
   overlay.addEventListener('click', (e) => {
@@ -1208,271 +1067,11 @@ function removeShieldOverlay(){
 
 
 function startHeartbeat(licenseKey){
-  if(qlHeartbeatInterval) clearInterval(qlHeartbeatInterval);
-
-  qlHeartbeatInterval = setInterval(async () => {
-    try {
-      const data = await bgFetch(VALIDATE_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ license_key: licenseKey, session_id: qlSessionId, heartbeat: true, device_id: qlDeviceId })
-      });
-
-      if(!data.valid){
-        clearInterval(qlHeartbeatInterval);
-        const msg = data.reason === "device_conflict" ? data.message : null;
-        chrome.storage.local.remove(["ql_license_valid","ql_license_key","ql_session_id","ql_user_name","ql_expires_at","ql_activated_at","ql_license_status"], () => {
-          const box = document.getElementById("ql-floating");
-          if(box) showLicenseGate(box);
-          if(msg) setTimeout(() => showCustomAlert("Access Denied", msg), 500);
-        });
-        return;
-      }
-
-      qlOnlineCount = data.online_count || 0;
-      const countEl = document.getElementById("ql-online-count");
-      if(countEl) countEl.textContent = qlOnlineCount;
-
-      if(data.user_name) {
-        qlUserName = data.user_name;
-        qlLicenseStatus = data.status || qlLicenseStatus;
-        qlExpiresAt = data.expires_at || qlExpiresAt;
-        qlActivatedAt = data.activated_at || qlActivatedAt;
-        chrome.storage.local.set({ ql_user_name: qlUserName, ql_license_status: qlLicenseStatus, ql_expires_at: qlExpiresAt, ql_activated_at: qlActivatedAt });
-        const nameEl = document.querySelector(".ql-profile-name");
-        if(nameEl) nameEl.textContent = data.user_name;
-      }
-      if (data.method_version) {
-        chrome.storage.local.set({ ql_method_version: data.method_version });
-      }
-
-    } catch(err) {
-      console.warn("[QL] Heartbeat error", err);
-    }
-  }, 60000);
+  // Heartbeat removed — fully offline
 }
-
-let qlExpiredHandled = false;
 
 function handleLicenseExpired(){
-  if(qlExpiredHandled) return;
-  qlExpiredHandled = true;
-  if(qlHeartbeatInterval) clearInterval(qlHeartbeatInterval);
-  if(window.qlCountdownInterval) clearInterval(window.qlCountdownInterval);
-
-  const overlay = document.createElement("div");
-  overlay.className = "ql-sweetalert-overlay";
-  overlay.innerHTML = templateExpiredOverlay();
-
-  const box = document.getElementById("ql-floating");
-  if(box) box.appendChild(overlay);
-  requestAnimationFrame(() => overlay.classList.add("ql-sweetalert-visible"));
-
-  const renewBtn = overlay.querySelector("#ql-sweetalert-renew");
-  if(renewBtn){
-    renewBtn.addEventListener("click", () => {
-      overlay.remove();
-      if(box) showPaymentUI(box);
-    });
-  }
-
-  const closeBtn = overlay.querySelector("#ql-sweetalert-close");
-  if(closeBtn){
-    closeBtn.addEventListener("click", () => {
-      overlay.classList.remove("ql-sweetalert-visible");
-      setTimeout(() => {
-        overlay.remove();
-        chrome.storage.local.remove(["ql_license_valid","ql_license_key","ql_session_id","ql_user_name","ql_expires_at","ql_license_status"], () => {
-          if(box) showLicenseGate(box);
-        });
-      }, 300);
-    });
-  }
-}
-
-async function showPaymentUI(box, preselectedPkg){
-  if(preselectedPkg){
-    showCheckoutScreen(box, preselectedPkg);
-    return;
-  }
-
-  box.innerHTML = templatePaymentUI(qlMinimized);
-
-  setupMinimize();
-  setupDrag();
-  setupResize();
-
-  // BRL plans -> Discord redirect
-  document.querySelectorAll(".ql-brl-buy").forEach(function(btn){
-    btn.addEventListener("click", function(){
-      var card = btn.closest(".ql-pkg-brl");
-      if(!card) return;
-      var idx = parseInt(card.getAttribute("data-brl-idx"), 10) || 0;
-      var plan = QL_BRL_PLANS[idx];
-      if(!plan) return;
-      var msg = "Hello! 👋 I am interested in the *" + plan.name + "* plan from VibeX Academy - Lovable Extension (R$ " + plan.price + " - " + plan.period + ").\n\nI would like more information to complete the purchase. 🚀";
-      var url = "https://wa.me/8801889067101";
-      window.open(url, "_blank", "noopener,noreferrer");
-    });
-  });
-
-  const backBtn = document.getElementById("ql-pay-back");
-  if(backBtn){
-    backBtn.addEventListener("click", () => {
-      chrome.storage.local.get(["ql_license_valid"], (res) => {
-        if(res.ql_license_valid) showMainUI(box);
-        else showLicenseGate(box);
-      });
-    });
-  }
-
-  try {
-    const packages = await bgFetch(PACKAGES_URL, {
-      method: "GET",
-      headers: { "apikey": SUPABASE_ANON_KEY }
-    });
-
-    const list = document.getElementById("ql-packages-list");
-    if(!list) return;
-    if(!packages || !Array.isArray(packages) || packages.length === 0){
-      list.innerHTML = '<div class="ql-pay-loading">No plans available.</div>';
-      return;
-    }
-
-    list.innerHTML = packages.map(pkg => templatePackageCard(pkg)).join('');
-
-    list.querySelectorAll(".ql-pkg-card").forEach(card => {
-      card.querySelector(".ql-pkg-select-btn").addEventListener("click", () => {
-        const pkg = {
-          id: card.getAttribute("data-pkg-id"),
-          name: card.getAttribute("data-pkg-name"),
-          price: card.getAttribute("data-pkg-price")
-        };
-        showCheckoutScreen(box, pkg);
-      });
-    });
-
-  } catch(err) {
-    console.error("[QL] Package load error:", err);
-    const list = document.getElementById("ql-packages-list");
-    if(list) list.innerHTML = '<div class="ql-pay-loading">Error loading plans. Try again.</div>';
-  }
-}
-
-function showCheckoutScreen(box, pkg){
-  box.innerHTML = templateCheckoutScreen(pkg, qlMinimized);
-
-  setupMinimize();
-  setupDrag();
-  setupResize();
-
-  let selectedMethod = "mpesa";
-
-  const backBtn = document.getElementById("ql-checkout-back");
-  if(backBtn){
-    backBtn.addEventListener("click", () => showPaymentUI(box));
-  }
-
-  document.querySelectorAll(".ql-method-btn").forEach(btn => {
-    btn.addEventListener("click", () => {
-      document.querySelectorAll(".ql-method-btn").forEach(b => b.classList.remove("ql-method-active"));
-      btn.classList.add("ql-method-active");
-      selectedMethod = btn.getAttribute("data-method");
-      const hint = document.getElementById("ql-phone-hint");
-      if(hint) hint.textContent = selectedMethod === "mpesa" ? "M-Pesa: 84 or 85" : "e-Mola: 86 or 87";
-    });
-  });
-
-  const confirmBtn = document.getElementById("ql-confirm-pay");
-  if(confirmBtn){
-    confirmBtn.addEventListener("click", async () => {
-      const phone = (document.getElementById("ql-pay-phone") || {}).value ? (document.getElementById("ql-pay-phone") || {}).value.replace(/\D/g,"") : "";
-      const log = document.getElementById("ql-pay-log");
-
-      if(phone.length !== 9){
-        if(log){ log.className = "ql-pay-log ql-pay-error"; log.textContent = "Number must have 9 digits."; }
-        return;
-      }
-      const prefix = phone.substring(0,2);
-      if(selectedMethod === "mpesa" && !["84","85"].includes(prefix)){
-        if(log){ log.className = "ql-pay-log ql-pay-error"; log.textContent = "M-Pesa: use 84 or 85."; }
-        return;
-      }
-      if(selectedMethod === "emola" && !["86","87"].includes(prefix)){
-        if(log){ log.className = "ql-pay-log ql-pay-error"; log.textContent = "e-Mola: use 86 or 87."; }
-        return;
-      }
-
-      confirmBtn.disabled = true;
-      confirmBtn.textContent = "⏳ Processing...";
-      if(log){ log.className = "ql-pay-log ql-pay-info"; log.textContent = "Sending payment request..."; }
-
-      try {
-        const storageData = await new Promise(r => chrome.storage.local.get(["ql_license_key"], r));
-        const licenseKey = storageData.ql_license_key || "";
-
-        const result = await bgFetch(EXT_PAYMENT_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY },
-          body: JSON.stringify({
-            packageId: pkg.id,
-            numero: phone,
-            metodo: selectedMethod,
-            license_key: licenseKey || undefined
-          })
-        });
-
-        if(result && result.status === "sucesso"){
-          const bodyEl = document.getElementById("ql-body");
-          if(bodyEl){
-            bodyEl.innerHTML = templatePaymentSuccess(result.license_key);
-
-            const copyBtn = document.getElementById("ql-copy-key");
-            if(copyBtn){
-              copyBtn.addEventListener("click", () => {
-                navigator.clipboard.writeText(result.license_key).then(() => {
-                  copyBtn.textContent = "✅ Copied!";
-                  setTimeout(() => { copyBtn.textContent = "📋 Copy Key"; }, 2000);
-                }).catch(() => {
-                  const keyEl = document.getElementById("ql-new-key");
-                  if(keyEl){ const r = document.createRange(); r.selectNodeContents(keyEl); window.getSelection().removeAllRanges(); window.getSelection().addRange(r); }
-                  copyBtn.textContent = "Selected — Ctrl+C";
-                });
-              });
-            }
-
-            const activateBtn = document.getElementById("ql-activate-key");
-            if(activateBtn){
-              activateBtn.addEventListener("click", () => {
-                chrome.storage.local.set({
-                  ql_license_valid: true,
-                  ql_license_key: result.license_key,
-                  ql_expires_at: result.expires_at || null,
-                  ql_license_status: "active",
-                  ql_session_id: null
-                }, () => {
-                  qlExpiresAt = result.expires_at || null;
-                  qlLicenseStatus = "active";
-                  qlExpiredHandled = false;
-                  showMainUI(box);
-                  startHeartbeat(result.license_key);
-                });
-              });
-            }
-          }
-        } else {
-          const errMsg = (result && result.error) ? result.error : "Payment failed. Please try again.";
-          if(log){ log.className = "ql-pay-log ql-pay-error"; log.textContent = "✗ " + errMsg; }
-          confirmBtn.disabled = false;
-          confirmBtn.textContent = "💰 Pay " + pkg.price + " MZN";
-        }
-      } catch(err) {
-        if(log){ log.className = "ql-pay-log ql-pay-error"; log.textContent = "✗ " + (err.message || "Connection error."); }
-        confirmBtn.disabled = false;
-        confirmBtn.textContent = "💰 Pay " + pkg.price + " MZN";
-      }
-    });
-  }
+  // In offline mode, license never expires — no-op
 }
 
 // Robust initialization: wait for document.body AND Lovable app shell
@@ -1857,8 +1456,7 @@ async function uploadFileV2Lovable(file, token, projectId) {
 
 async function uploadFileDirect(file, token, opts) {
   opts = opts || {};
-  // Sempre usa o fluxo V2 via proxy-command. O upload direto para Supabase Storage
-  // retornava 400 em imagens para algumas contas/projetos.
+  // Always uses V2 flow — files go as base64 inside the messages request.
   return await uploadFileV2Lovable(file, token, opts.projectId || "");
 }
 
@@ -1967,7 +1565,7 @@ function setupFileAttachment() {
         qlAttachedFiles[placeholderIdx].uploading = false;
         renderAttachPreview();
       } catch (err) {
-        console.warn('[QL Upload] Failed to send to Supabase Storage:', err.message);
+        console.warn('[QL Upload] Failed to process file:', err.message);
         qlAttachedFiles[placeholderIdx].uploading = false;
         qlAttachedFiles[placeholderIdx].uploadFailed = true;
         renderAttachPreview();
@@ -2047,59 +1645,53 @@ function setupSend(){
       btn.classList.add("ql-sending");
       btn.disabled = true;
 
-      // Build payload for proxy-command (handles everything server-side)
-      const payload = {
-        license_key: licenseKey,
-        session_id: qlSessionId,
-        projeto_id: projectId,
-        token_lovable: token,
-        mensagem: finalMensagem,
-        modo_pensar: modoPlano,
-        modelo_ia: activeModel,
-        device_id: qlDeviceId,
-        browser_session_id: storageData.lovable_browserSessionId || ''
+      // Build payload for direct Lovable API
+      var sessionHeaders = await buildSessionHeaders(projectId);
+      var requestHeaders = Object.assign({}, sessionHeaders, {
+        "Authorization": "Bearer " + token,
+        "Content-Type": "application/json"
+      });
+
+      var messagePayload = {
+        message: finalMensagem,
+        mode: modoPlano ? "discuss" : "build"
       };
 
+      // Attach v2 pending files as base64 images
       if (v2Pending.length > 0) {
-        var uploadFiles = [];
+        var imageAttachments = [];
         for (var ui = 0; ui < v2Pending.length; ui++) {
           var pending = v2Pending[ui];
           var base64Data = await blobToBase64(pending.rawFile);
-          uploadFiles.push({
-            file_data: base64Data,
-            file_name: pending.file_name || ('file_' + ui),
-            file_type: pending.mime_type || pending.file_type || 'application/octet-stream'
+          imageAttachments.push({
+            data: base64Data,
+            name: pending.file_name || ('file_' + ui),
+            type: pending.mime_type || pending.file_type || 'application/octet-stream'
           });
         }
-        if (uploadFiles.length > 0) payload.upload_files = uploadFiles;
+        if (imageAttachments.length > 0) messagePayload.images = imageAttachments;
       }
 
-      // Per-device fingerprint headers
-      payload.session_headers = await buildSessionHeaders(projectId);
-
-      var result = await bgFetch(PROXY_COMMAND_URL, {
+      var result = await bgFetch("https://api.lovable.dev/projects/" + projectId + "/messages", {
         method: "POST",
-        headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY },
-        body: JSON.stringify(payload)
+        headers: requestHeaders,
+        body: JSON.stringify(messagePayload)
       });
 
-      if(result && result.success === false){
-        throw new Error(result.error_display || result.message || "Send error");
+      if(result && result.error){
+        throw new Error(result.error || "Send error");
       }
 
-      var apiData = result.data || result;
-      var msgId = apiData.ai_message_id_usado || '';
       if(log){
         if (hasImage) {
           log.className = "ql-log-success";
-          log.innerText = "✓ Prompt sent! valid image 😁";
+          log.innerText = "Prompt sent with image!";
         } else {
           log.className = "ql-log-success";
-          log.innerText = "✓ Prompt sent!";
+          log.innerText = "Prompt sent!";
         }
       }
       try { if(typeof QLSounds!=="undefined") QLSounds.promptSent(); } catch(e){}
-      if (msgId) console.log('[QL] API message ID:', msgId);
 
       // Save to chat history
       addToChatHistory(mensagem, 'ok');
@@ -2345,8 +1937,6 @@ async function handleFilesAttach(files) {
 }
 
 // ===== DOWNLOAD ALL PROJECT FILES (Popup) =====
-var VERSIONS_URL_POPUP = "https://ynvrijkuampxpsmshftm.supabase.co/rest/v1/extension_versions?select=version,changelog,file_path,is_alert_active&order=created_at.desc&limit=1&is_alert_active=eq.true";
-var USER_ROLES_URL_POPUP = "https://ynvrijkuampxpsmshftm.supabase.co/rest/v1/user_roles?select=role";
 var CURRENT_EXT_VERSION_POPUP = "6.0.13";
 
 function setupDownloadProject() {
@@ -2355,21 +1945,10 @@ function setupDownloadProject() {
   btn.addEventListener('click', async function() {
     var statusEl = document.getElementById('ql-download-status');
     btn.disabled = true;
-    btn.textContent = 'Preparando...';
+    btn.textContent = 'Preparing...';
     if (statusEl) { statusEl.style.display = 'block'; statusEl.className = 'ql-log-info'; statusEl.textContent = 'Checking token and project...'; }
 
     try {
-      // ---- Feature flag gate ----
-      try {
-        var flagUrl = "https://ynvrijkuampxpsmshftm.supabase.co/rest/v1/feature_flags?select=enabled&flag_key=eq.download_files";
-        var flagRows = await bgFetch(flagUrl, { method: "GET", headers: { apikey: SUPABASE_ANON_KEY } });
-        if (flagRows && flagRows.length > 0 && flagRows[0].enabled === false) {
-          throw new Error('Error using extension features.');
-        }
-      } catch (flagErr) {
-        if (flagErr && flagErr.message === 'Error using extension features.') throw flagErr;
-      }
-
       var sd = await new Promise(function(r) { chrome.storage.local.get(['lovable_token', 'lovable_projectId'], r); });
       var authToken = sd.lovable_token || '';
       var storedProjectId = sd.lovable_projectId || '';
@@ -2433,39 +2012,6 @@ function setupDownloadProject() {
       setTimeout(function() { btn.textContent = 'Download All Files'; btn.disabled = false; }, 3000);
     }
   });
-}
-
-// ===== UPDATE CHECK (Popup) =====
-async function checkForUpdatePopup() {
-  try {
-    var data = await bgFetch(VERSIONS_URL_POPUP, { method: "GET", headers: { apikey: SUPABASE_ANON_KEY } });
-    if (!data || !data.length) return;
-    var latest = data[0];
-    if (latest.version !== CURRENT_EXT_VERSION_POPUP && latest.is_alert_active) {
-      var banner = document.getElementById('ql-update-banner');
-      if (banner) {
-        var dlUrl = latest.file_path ? "https://ynvrijkuampxpsmshftm.supabase.co/storage/v1/object/public/extension-releases/" + latest.file_path : null;
-        banner.innerHTML = '<div style="padding:10px 12px;background:linear-gradient(135deg,rgba(236,72,153,0.12),rgba(124,58,237,0.08));border:1px solid rgba(236,72,153,0.30);border-radius:10px;margin:8px 0"><div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><span style="font-size:14px">&#128276;</span><strong style="font-size:11px;color:#EC4899">New update v' + latest.version + '!</strong></div><p style="font-size:10px;color:#a1a1aa;margin:0 0 6px;white-space:pre-line">' + (latest.changelog || '') + '</p>' + (dlUrl ? '<a href="' + dlUrl + '" target="_blank" style="display:inline-block;padding:4px 12px;background:#EC4899;color:#000;border-radius:6px;text-decoration:none;font-size:10px;font-weight:700">Download v' + latest.version + '</a>' : '') + '</div>';
-        banner.style.display = 'block';
-      }
-    }
-  } catch(e) {}
-}
-
-// ===== RESELLER ROLE CHECK (Popup) =====
-async function checkResellerRolePopup() {
-  try {
-    var storageData = await new Promise(function(r) { chrome.storage.local.get(["ql_license_key"], r); });
-    if (!storageData.ql_license_key) return;
-    var licData = await bgFetch("https://ynvrijkuampxpsmshftm.supabase.co/rest/v1/licenses?select=user_id&license_key=eq." + encodeURIComponent(storageData.ql_license_key) + "&limit=1", { method: "GET", headers: { apikey: SUPABASE_ANON_KEY } });
-    if (!licData || !licData.length || !licData[0].user_id) return;
-    var userId = licData[0].user_id;
-    var roleData = await bgFetch(USER_ROLES_URL_POPUP + "&user_id=eq." + userId, { method: "GET", headers: { apikey: SUPABASE_ANON_KEY } });
-    if (roleData && Array.isArray(roleData) && roleData.some(function(r) { return r.role === 'reseller' || r.role === 'admin'; })) {
-      var btn = document.getElementById('ql-reseller-btn');
-      if (btn) btn.style.display = 'block';
-    }
-  } catch(e) {}
 }
 
 // ===== NATIVE CHAT MODE =====
@@ -2545,7 +2091,7 @@ function injectNativeChatOverlay() {
     badge = document.createElement("div");
     badge.id = "ql-native-badge";
     badge.className = "ql-native-badge";
-    badge.innerHTML = "\u26a1 <span>VibeX Academy - Lovable Extension</span>";
+    badge.innerHTML = "\u26a1 <span>TechVai - Lovable Extension</span>";
   }
   if (badge.parentElement !== chatForm) chatForm.appendChild(badge);
 
@@ -2684,32 +2230,34 @@ async function sendViaNativeChat(text, editor) {
   if (token.startsWith("Bearer ")) token = token.slice(7);
 
   try {
-    // Detecta automaticamente: (1) se o usuário clicou no botão "Plan" nativo
-    // do Lovable e (2) se há imagens anexadas pelo botão "Attach" nativo.
     const planActive = detectLovableNativePlan();
     const nativeImages = await collectNativeChatImages();
 
-    const payload = {
-      license_key: licenseKey,
-      session_id: qlSessionId,
-      projeto_id: projectId,
-      token_lovable: token,
-      mensagem: text,
-      modo_pensar: planActive,
-      device_id: (typeof qlDeviceId !== 'undefined' ? qlDeviceId : undefined)
-    };
-    if (nativeImages.length > 0) {
-      payload.upload_files = nativeImages;
-    }
-
-    var result = await bgFetch(PROXY_COMMAND_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "apikey": SUPABASE_ANON_KEY },
-      body: JSON.stringify(payload)
+    var sessionHeaders = await buildSessionHeaders(projectId);
+    var requestHeaders = Object.assign({}, sessionHeaders, {
+      "Authorization": "Bearer " + token,
+      "Content-Type": "application/json"
     });
 
-    if (result && result.success === false) {
-      throw new Error(result.error_display || result.message || "Send error");
+    var messagePayload = {
+      message: text,
+      mode: planActive ? "discuss" : "build"
+    };
+
+    if (nativeImages.length > 0) {
+      messagePayload.images = nativeImages.map(function(img) {
+        return { data: img.file_data, name: img.file_name, type: img.file_type };
+      });
+    }
+
+    var result = await bgFetch("https://api.lovable.dev/projects/" + projectId + "/messages", {
+      method: "POST",
+      headers: requestHeaders,
+      body: JSON.stringify(messagePayload)
+    });
+
+    if (result && result.error) {
+      throw new Error(result.error || "Send error");
     }
 
     // Clear the editor
@@ -2937,11 +2485,9 @@ function setupCreateProject() {
     btn.textContent = 'Creating project...';
     if (statusEl) { statusEl.style.display = 'block'; statusEl.className = 'ql-log-info'; statusEl.textContent = 'Preparing creation...'; }
     try {
-      var sd = await new Promise(function(r) { chrome.storage.local.get(['lovable_token', 'ql_license_key'], r); });
+      var sd = await new Promise(function(r) { chrome.storage.local.get(['lovable_token'], r); });
       var authToken = sd.lovable_token || '';
-      var licenseKey = sd.ql_license_key || '';
       if (authToken.indexOf('Bearer ') === 0) authToken = authToken.slice(7);
-      if (!licenseKey) throw new Error('License not found.');
       if (!authToken) {
         try { window.postMessage({ type: 'lovableRequestToken' }, '*'); } catch(e) {}
         await new Promise(function(r){ setTimeout(r, 600); });
@@ -2950,21 +2496,30 @@ function setupCreateProject() {
       }
       if (!authToken) throw new Error('Open lovable.dev and wait for sync.');
 
-      if (statusEl) statusEl.textContent = 'Requesting creation on the server...';
-      var resp = await fetch(PROXY_COMMAND_URL.replace('proxy-command', 'create-lovable-project'), {
+      if (statusEl) statusEl.textContent = 'Creating project...';
+      var sessionHeaders = await buildSessionHeaders('');
+      var createHeaders = Object.assign({}, sessionHeaders, {
+        "Authorization": "Bearer " + authToken,
+        "Content-Type": "application/json"
+      });
+      var resp = await fetch("https://api.lovable.dev/projects", {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY },
-        body: JSON.stringify({ license_key: licenseKey, token_lovable: authToken })
+        headers: createHeaders,
+        body: JSON.stringify({ title: 'New Project' })
       });
       var data = await resp.json();
-      if (!data || !data.success || !data.link) {
-        throw new Error((data && data.error_display) || 'Failed to create project');
+      if (!resp.ok || !data) {
+        throw new Error((data && (data.error || data.message)) || 'Failed to create project');
       }
-      if (statusEl) { statusEl.className = 'ql-log-success'; statusEl.textContent = '✅ Project created! Redirecting...'; }
-      btn.textContent = '✅ Success!';
+      var projectLink = (data.id ? 'https://lovable.dev/projects/' + data.id : (data.link || null));
+      if (!projectLink) {
+        throw new Error('Failed to get project link');
+      }
+      if (statusEl) { statusEl.className = 'ql-log-success'; statusEl.textContent = 'Project created! Redirecting...'; }
+      btn.textContent = 'Success!';
       setTimeout(function(){
-        try { window.location.href = data.link; }
-        catch(e) { window.open(data.link, '_blank'); }
+        try { window.location.href = projectLink; }
+        catch(e) { window.open(projectLink, '_blank'); }
       }, 400);
     } catch(err) {
       console.error('[CreateProject]', err);

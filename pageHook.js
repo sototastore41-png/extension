@@ -1,5 +1,5 @@
 (function () {
-console.log("[VibeXAcademyHook] Iniciando");
+console.log("[TechVaiHook] Iniciando");
 
 let capturedToken = null;
 let capturedProjectId = null;
@@ -69,8 +69,8 @@ function notifyFound(token, projectId, browserSessionId, force = false){
   if(newProject && newProject !== capturedProjectId){ capturedProjectId = newProject; changed = true; }
   if(normalizedSession && normalizedSession !== capturedBrowserSessionId){ capturedBrowserSessionId = normalizedSession; changed = true; }
   if(!changed && !force) return;
-  console.log("[VibeXAcademyHook] ✅ Lovable session synced", capturedToken ? "token" : "no token", capturedBrowserSessionId ? "bsess" : "no bsess");
-  console.log("[VibeXAcademyHook] ProjectId:", capturedProjectId);
+  console.log("[TechVaiHook] Lovable session synced", capturedToken ? "token" : "no token", capturedBrowserSessionId ? "bsess" : "no bsess");
+  console.log("[TechVaiHook] ProjectId:", capturedProjectId);
   window.postMessage({ type:"lovableTokenFound", token:capturedToken, projectId:capturedProjectId, browserSessionId:capturedBrowserSessionId },"*");
 }
 
@@ -108,7 +108,7 @@ window.addEventListener("message", (event)=>{
       }catch(e){}
       return originalFetch.apply(this,args);
     };
-  }catch(e){ console.warn("[VibeXAcademyHook] fetch error",e); }
+  }catch(e){ console.warn("[TechVaiHook] fetch error",e); }
 })();
 
 (function wrapXHR(){
@@ -130,7 +130,7 @@ window.addEventListener("message", (event)=>{
       }
       return origSetHeader.apply(this,arguments);
     };
-  }catch(e){ console.warn("[VibeXAcademyHook] xhr error",e); }
+  }catch(e){ console.warn("[TechVaiHook] xhr error",e); }
 })();
 
 setInterval(()=>{

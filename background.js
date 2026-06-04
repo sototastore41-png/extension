@@ -1,4 +1,4 @@
-console.log("[Background] VibeX Academy service worker started");
+console.log("[Background] TechVai service worker started");
 
 async function enableActionSidePanel() {
   try {
@@ -13,7 +13,7 @@ async function enableActionSidePanel() {
   }
 }
 
-async function openVibeXAcademyPanel(tab) {
+async function openTechVaiPanel(tab) {
   await enableActionSidePanel();
   if (!tab || !tab.id) throw new Error("Active tab not found.");
   await chrome.sidePanel.open({ tabId: tab.id });
@@ -48,7 +48,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
 // Handle extension icon clicks and open the side panel immediately.
 chrome.action.onClicked.addListener(async (tab) => {
   try {
-    await openVibeXAcademyPanel(tab);
+    await openTechVaiPanel(tab);
   } catch(err) {
     console.error("[Background] action.onClicked sidePanel error:", err);
   }
@@ -111,7 +111,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     enableActionSidePanel();
     // Try to open if sender is a tab (content script click IS a user gesture propagated)
     if (sender.tab && sender.tab.id) {
-      openVibeXAcademyPanel(sender.tab).then(() => {
+      openTechVaiPanel(sender.tab).then(() => {
         sendResponse({ ok: true });
       }).catch((err) => {
         console.warn("[Background] sidePanel.open deferred:", err.message);
@@ -133,7 +133,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg && msg.action === "openSidePanel") {
     // This can only work if triggered from a user gesture context
     if (sender.tab && sender.tab.id) {
-      openVibeXAcademyPanel(sender.tab).then(() => {
+      openTechVaiPanel(sender.tab).then(() => {
         sendResponse({ ok: true });
       }).catch((err) => {
         console.warn("[Background] openSidePanel deferred:", err.message);

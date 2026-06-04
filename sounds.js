@@ -1,4 +1,4 @@
-// VibeX Academy - Lovable Extension - Sound System v6.0
+// TechVai - Lovable Extension - Sound System v6.0
 // Plays categorized audio cues for success/error events.
 (function(global){
   var _ctx = null;

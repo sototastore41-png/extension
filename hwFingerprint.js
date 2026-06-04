@@ -1,5 +1,5 @@
 // ============================================
-// VibeX Academy - Lovable Extension – Hardware Fingerprint
+// TechVai - Lovable Extension – Hardware Fingerprint
 // Generates a stable device hash from hardware
 // attributes that persist across browsers/cache
 // ============================================
