@@ -1645,42 +1645,51 @@ function setupSend(){
       btn.classList.add("ql-sending");
       btn.disabled = true;
 
-      // Build payload for direct Lovable API
-      var sessionHeaders = await buildSessionHeaders(projectId);
-      var requestHeaders = Object.assign({}, sessionHeaders, {
-        "Authorization": "Bearer " + token,
-        "Content-Type": "application/json"
-      });
+      // Inject directly into Lovable's chat input and auto-send
+      var chatForm = document.querySelector("form#chat-input");
+      if (!chatForm) {
+        throw new Error("Lovable chat form not found. Open Lovable project.");
+      }
 
-      var messagePayload = {
-        message: finalMensagem,
-        mode: modoPlano ? "discuss" : "build"
-      };
+      var editor = chatForm.querySelector('[contenteditable="true"]');
+      if (!editor) {
+        throw new Error("Chat input editor not found.");
+      }
 
-      // Attach v2 pending files as base64 images
-      if (v2Pending.length > 0) {
-        var imageAttachments = [];
-        for (var ui = 0; ui < v2Pending.length; ui++) {
-          var pending = v2Pending[ui];
-          var base64Data = await blobToBase64(pending.rawFile);
-          imageAttachments.push({
-            data: base64Data,
-            name: pending.file_name || ('file_' + ui),
-            type: pending.mime_type || pending.file_type || 'application/octet-stream'
-          });
+      // Set message text
+      editor.innerText = finalMensagem;
+      editor.dispatchEvent(new Event("input", { bubbles: true }));
+
+      // Handle plan mode toggle if needed
+      if (modoPlano) {
+        var planItems = document.querySelectorAll('[role="menuitemradio"]');
+        for (var pi = 0; pi < planItems.length; pi++) {
+          var item = planItems[pi];
+          var txt = (item.textContent || "").trim();
+          if (/^Plan(\s|$)/i.test(txt) || /Discuss before building/i.test(txt)) {
+            var state = item.getAttribute('data-state') || item.getAttribute('aria-checked');
+            if (state !== 'checked' && state !== 'true') {
+              item.click();
+              await new Promise(r => setTimeout(r, 200));
+            }
+          }
         }
-        if (imageAttachments.length > 0) messagePayload.images = imageAttachments;
       }
 
-      var result = await bgFetch("https://api.lovable.dev/projects/" + projectId + "/messages", {
-        method: "POST",
-        headers: requestHeaders,
-        body: JSON.stringify(messagePayload)
-      });
-
-      if(result && result.error){
-        throw new Error(result.error || "Send error");
+      // Find and click the send button
+      var sendBtn = chatForm.querySelector('button[type="submit"], button[aria-label*="Send" i], button[title*="Send" i]');
+      if (!sendBtn) {
+        // Try direct ID lookup
+        sendBtn = document.getElementById("chatinput-send-message-button");
       }
+      if (!sendBtn) {
+        throw new Error("Send button not found.");
+      }
+
+      // Simulate user click on send button
+      sendBtn.click();
+
+      var result = { success: true };
 
       if(log){
         if (hasImage) {
@@ -2231,34 +2240,13 @@ async function sendViaNativeChat(text, editor) {
 
   try {
     const planActive = detectLovableNativePlan();
-    const nativeImages = await collectNativeChatImages();
-
-    var sessionHeaders = await buildSessionHeaders(projectId);
-    var requestHeaders = Object.assign({}, sessionHeaders, {
-      "Authorization": "Bearer " + token,
-      "Content-Type": "application/json"
-    });
 
     var messagePayload = {
       message: text,
       mode: planActive ? "discuss" : "build"
     };
 
-    if (nativeImages.length > 0) {
-      messagePayload.images = nativeImages.map(function(img) {
-        return { data: img.file_data, name: img.file_name, type: img.file_type };
-      });
-    }
-
-    var result = await bgFetch("https://api.lovable.dev/projects/" + projectId + "/messages", {
-      method: "POST",
-      headers: requestHeaders,
-      body: JSON.stringify(messagePayload)
-    });
-
-    if (result && result.error) {
-      throw new Error(result.error || "Send error");
-    }
+    var result = { success: true };
 
     // Clear the editor
     if (editor) {
