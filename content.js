@@ -1645,60 +1645,27 @@ function setupSend(){
       btn.classList.add("ql-sending");
       btn.disabled = true;
 
-      // Send via direct DOM manipulation
-      await new Promise((resolve, reject) => {
-        const chatForm = document.querySelector("form#chat-input");
-        if (!chatForm) {
-          reject(new Error("Lovable chat form not found on this page"));
-          return;
-        }
+      // Use pageHook to send message through page context
+      window.postMessage({
+        type: "techvaiSendMessage",
+        message: finalMensagem
+      }, "*");
 
-        // Find editor (try multiple selectors)
-        let editor = chatForm.querySelector('[contenteditable="true"]');
-        if (!editor) editor = chatForm.querySelector('[contenteditable]');
-        if (!editor) editor = chatForm.querySelector('div[role="textbox"]');
+      // Wait for response from pageHook
+      var result = await new Promise((resolve, reject) => {
+        var timeout = setTimeout(() => {
+          reject(new Error("Message send timeout - make sure you're on a Lovable project page"));
+        }, 5000);
 
-        if (!editor) {
-          reject(new Error("Chat editor not found"));
-          return;
-        }
-
-        // Set text
-        if (editor.contentEditable === "true") {
-          editor.innerText = finalMensagem;
-        } else {
-          editor.textContent = finalMensagem;
-        }
-
-        // Trigger input events so Lovable detects the change
-        editor.dispatchEvent(new Event("input", { bubbles: true }));
-        editor.dispatchEvent(new Event("change", { bubbles: true }));
-
-        // Find send button (try multiple selectors)
-        let sendBtn = chatForm.querySelector('button[type="submit"]');
-        if (!sendBtn) sendBtn = chatForm.querySelector('button[aria-label*="Send" i]');
-        if (!sendBtn) {
-          const buttons = chatForm.querySelectorAll('button');
-          if (buttons.length > 0) sendBtn = buttons[buttons.length - 1];
-        }
-
-        if (!sendBtn) {
-          reject(new Error("Send button not found"));
-          return;
-        }
-
-        // Click send with a small delay to let Lovable process the input
-        setTimeout(() => {
-          try {
-            sendBtn.click();
-            resolve({ success: true });
-          } catch (err) {
-            reject(err);
+        var handler = (event) => {
+          if (event.data && event.data.type === "techvaiSendResponse") {
+            clearTimeout(timeout);
+            window.removeEventListener("message", handler);
+            resolve(event.data);
           }
-        }, 100);
+        };
+        window.addEventListener("message", handler);
       });
-
-      var result = { success: true };
 
       if(log){
         if (hasImage) {
@@ -2248,44 +2215,26 @@ async function sendViaNativeChat(text, editor) {
   if (token.startsWith("Bearer ")) token = token.slice(7);
 
   try {
-    // Send via direct DOM manipulation
-    const chatForm = document.querySelector("form#chat-input");
-    if (!chatForm) {
-      throw new Error("Chat form not found");
-    }
+    // Send via pageHook
+    window.postMessage({
+      type: "techvaiSendMessage",
+      message: text
+    }, "*");
 
-    let editor = chatForm.querySelector('[contenteditable="true"]');
-    if (!editor) editor = chatForm.querySelector('[contenteditable]');
-    if (!editor) editor = chatForm.querySelector('div[role="textbox"]');
+    var result = await new Promise((resolve, reject) => {
+      var timeout = setTimeout(() => {
+        reject(new Error("Message send timeout"));
+      }, 5000);
 
-    if (!editor) {
-      throw new Error("Chat editor not found");
-    }
-
-    if (editor.contentEditable === "true") {
-      editor.innerText = text;
-    } else {
-      editor.textContent = text;
-    }
-
-    editor.dispatchEvent(new Event("input", { bubbles: true }));
-    editor.dispatchEvent(new Event("change", { bubbles: true }));
-
-    let sendBtn = chatForm.querySelector('button[type="submit"]');
-    if (!sendBtn) sendBtn = chatForm.querySelector('button[aria-label*="Send" i]');
-    if (!sendBtn) {
-      const buttons = chatForm.querySelectorAll('button');
-      if (buttons.length > 0) sendBtn = buttons[buttons.length - 1];
-    }
-
-    if (!sendBtn) {
-      throw new Error("Send button not found");
-    }
-
-    await new Promise(r => setTimeout(r, 100));
-    sendBtn.click();
-
-    var result = { success: true };
+      var handler = (event) => {
+        if (event.data && event.data.type === "techvaiSendResponse") {
+          clearTimeout(timeout);
+          window.removeEventListener("message", handler);
+          resolve(event.data);
+        }
+      };
+      window.addEventListener("message", handler);
+    });
 
     // Clear the editor
     if (editor) {
