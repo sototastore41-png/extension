@@ -1645,33 +1645,57 @@ function setupSend(){
       btn.classList.add("ql-sending");
       btn.disabled = true;
 
-      // Send via page hook (runs in page context, can interact with Lovable UI)
+      // Send via direct DOM manipulation
       await new Promise((resolve, reject) => {
-        let responded = false;
-        const timeout = setTimeout(() => {
-          if (!responded) {
-            responded = true;
-            reject(new Error("Message send timeout"));
-          }
-        }, 3000);
-
-        function handleResponse(event) {
-          if (event.data && event.data.type === "techvaiSendResponse") {
-            if (!responded) {
-              responded = true;
-              clearTimeout(timeout);
-              window.removeEventListener("message", handleResponse);
-              if (event.data.success) {
-                resolve(event.data);
-              } else {
-                reject(new Error(event.data.error || "Message send failed"));
-              }
-            }
-          }
+        const chatForm = document.querySelector("form#chat-input");
+        if (!chatForm) {
+          reject(new Error("Lovable chat form not found on this page"));
+          return;
         }
 
-        window.addEventListener("message", handleResponse);
-        window.postMessage({ type: "techvaiSendMessage", message: finalMensagem }, "*");
+        // Find editor (try multiple selectors)
+        let editor = chatForm.querySelector('[contenteditable="true"]');
+        if (!editor) editor = chatForm.querySelector('[contenteditable]');
+        if (!editor) editor = chatForm.querySelector('div[role="textbox"]');
+
+        if (!editor) {
+          reject(new Error("Chat editor not found"));
+          return;
+        }
+
+        // Set text
+        if (editor.contentEditable === "true") {
+          editor.innerText = finalMensagem;
+        } else {
+          editor.textContent = finalMensagem;
+        }
+
+        // Trigger input events so Lovable detects the change
+        editor.dispatchEvent(new Event("input", { bubbles: true }));
+        editor.dispatchEvent(new Event("change", { bubbles: true }));
+
+        // Find send button (try multiple selectors)
+        let sendBtn = chatForm.querySelector('button[type="submit"]');
+        if (!sendBtn) sendBtn = chatForm.querySelector('button[aria-label*="Send" i]');
+        if (!sendBtn) {
+          const buttons = chatForm.querySelectorAll('button');
+          if (buttons.length > 0) sendBtn = buttons[buttons.length - 1];
+        }
+
+        if (!sendBtn) {
+          reject(new Error("Send button not found"));
+          return;
+        }
+
+        // Click send with a small delay to let Lovable process the input
+        setTimeout(() => {
+          try {
+            sendBtn.click();
+            resolve({ success: true });
+          } catch (err) {
+            reject(err);
+          }
+        }, 100);
       });
 
       var result = { success: true };
@@ -2224,36 +2248,42 @@ async function sendViaNativeChat(text, editor) {
   if (token.startsWith("Bearer ")) token = token.slice(7);
 
   try {
-    const planActive = detectLovableNativePlan();
+    // Send via direct DOM manipulation
+    const chatForm = document.querySelector("form#chat-input");
+    if (!chatForm) {
+      throw new Error("Chat form not found");
+    }
 
-    // Send via page hook
-    await new Promise((resolve, reject) => {
-      let responded = false;
-      const timeout = setTimeout(() => {
-        if (!responded) {
-          responded = true;
-          reject(new Error("Message send timeout"));
-        }
-      }, 3000);
+    let editor = chatForm.querySelector('[contenteditable="true"]');
+    if (!editor) editor = chatForm.querySelector('[contenteditable]');
+    if (!editor) editor = chatForm.querySelector('div[role="textbox"]');
 
-      function handleResponse(event) {
-        if (event.data && event.data.type === "techvaiSendResponse") {
-          if (!responded) {
-            responded = true;
-            clearTimeout(timeout);
-            window.removeEventListener("message", handleResponse);
-            if (event.data.success) {
-              resolve(event.data);
-            } else {
-              reject(new Error(event.data.error || "Message send failed"));
-            }
-          }
-        }
-      }
+    if (!editor) {
+      throw new Error("Chat editor not found");
+    }
 
-      window.addEventListener("message", handleResponse);
-      window.postMessage({ type: "techvaiSendMessage", message: text }, "*");
-    });
+    if (editor.contentEditable === "true") {
+      editor.innerText = text;
+    } else {
+      editor.textContent = text;
+    }
+
+    editor.dispatchEvent(new Event("input", { bubbles: true }));
+    editor.dispatchEvent(new Event("change", { bubbles: true }));
+
+    let sendBtn = chatForm.querySelector('button[type="submit"]');
+    if (!sendBtn) sendBtn = chatForm.querySelector('button[aria-label*="Send" i]');
+    if (!sendBtn) {
+      const buttons = chatForm.querySelectorAll('button');
+      if (buttons.length > 0) sendBtn = buttons[buttons.length - 1];
+    }
+
+    if (!sendBtn) {
+      throw new Error("Send button not found");
+    }
+
+    await new Promise(r => setTimeout(r, 100));
+    sendBtn.click();
 
     var result = { success: true };
 

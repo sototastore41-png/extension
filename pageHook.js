@@ -85,35 +85,70 @@ window.addEventListener("message", (event)=>{
   if(!event.data || event.data.type !== "techvaiSendMessage") return;
   try {
     const msg = event.data.message || "";
-    if (!msg) return;
+    console.log("[TechVaiHook] Received message:", msg.substring(0, 50));
+    if (!msg) {
+      console.log("[TechVaiHook] Empty message");
+      return;
+    }
 
     const chatForm = document.querySelector("form#chat-input");
     if (!chatForm) {
+      console.log("[TechVaiHook] Chat form not found, looking for editor directly");
       window.postMessage({ type: "techvaiSendResponse", success: false, error: "Chat form not found" }, "*");
       return;
     }
+    console.log("[TechVaiHook] Found chat form");
 
-    const editor = chatForm.querySelector('[contenteditable="true"]');
+    // Try multiple selectors for the editor
+    let editor = chatForm.querySelector('[contenteditable="true"]');
     if (!editor) {
+      editor = chatForm.querySelector('[contenteditable]');
+    }
+    if (!editor) {
+      editor = chatForm.querySelector('div[role="textbox"]');
+    }
+    if (!editor) {
+      console.log("[TechVaiHook] Editor not found. Available elements:", chatForm.innerHTML.substring(0, 200));
       window.postMessage({ type: "techvaiSendResponse", success: false, error: "Editor not found" }, "*");
       return;
     }
+    console.log("[TechVaiHook] Found editor");
 
-    // Set the message
-    editor.innerText = msg;
+    // Set the message with multiple approaches
+    if (editor.contentEditable === "true") {
+      editor.innerText = msg;
+    } else {
+      editor.textContent = msg;
+    }
     editor.dispatchEvent(new Event("input", { bubbles: true }));
     editor.dispatchEvent(new Event("change", { bubbles: true }));
 
-    // Find and click send button
-    const sendBtn = chatForm.querySelector('button[type="submit"], button[aria-label*="Send" i]');
+    // Try multiple button selectors
+    let sendBtn = chatForm.querySelector('button[type="submit"]');
     if (!sendBtn) {
+      sendBtn = chatForm.querySelector('button[aria-label*="Send" i]');
+    }
+    if (!sendBtn) {
+      sendBtn = chatForm.querySelector('button:last-child');
+    }
+    if (!sendBtn) {
+      const buttons = chatForm.querySelectorAll('button');
+      if (buttons.length > 0) {
+        sendBtn = buttons[buttons.length - 1];
+      }
+    }
+    if (!sendBtn) {
+      console.log("[TechVaiHook] Send button not found");
       window.postMessage({ type: "techvaiSendResponse", success: false, error: "Send button not found" }, "*");
       return;
     }
+    console.log("[TechVaiHook] Found send button, clicking...");
 
     sendBtn.click();
+    console.log("[TechVaiHook] Clicked send button");
     window.postMessage({ type: "techvaiSendResponse", success: true }, "*");
   } catch (err) {
+    console.error("[TechVaiHook] Error:", err);
     window.postMessage({ type: "techvaiSendResponse", success: false, error: err.message }, "*");
   }
 });
