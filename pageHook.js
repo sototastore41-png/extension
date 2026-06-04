@@ -80,6 +80,44 @@ window.addEventListener("message", (event)=>{
   notifyFound(capturedToken, getProjectFromPage() || capturedProjectId, capturedBrowserSessionId, true);
 });
 
+window.addEventListener("message", (event)=>{
+  if(event.source !== window) return;
+  if(!event.data || event.data.type !== "techvaiSendMessage") return;
+  try {
+    const msg = event.data.message || "";
+    if (!msg) return;
+
+    const chatForm = document.querySelector("form#chat-input");
+    if (!chatForm) {
+      window.postMessage({ type: "techvaiSendResponse", success: false, error: "Chat form not found" }, "*");
+      return;
+    }
+
+    const editor = chatForm.querySelector('[contenteditable="true"]');
+    if (!editor) {
+      window.postMessage({ type: "techvaiSendResponse", success: false, error: "Editor not found" }, "*");
+      return;
+    }
+
+    // Set the message
+    editor.innerText = msg;
+    editor.dispatchEvent(new Event("input", { bubbles: true }));
+    editor.dispatchEvent(new Event("change", { bubbles: true }));
+
+    // Find and click send button
+    const sendBtn = chatForm.querySelector('button[type="submit"], button[aria-label*="Send" i]');
+    if (!sendBtn) {
+      window.postMessage({ type: "techvaiSendResponse", success: false, error: "Send button not found" }, "*");
+      return;
+    }
+
+    sendBtn.click();
+    window.postMessage({ type: "techvaiSendResponse", success: true }, "*");
+  } catch (err) {
+    window.postMessage({ type: "techvaiSendResponse", success: false, error: err.message }, "*");
+  }
+});
+
 (function wrapFetch(){
   try{
     const originalFetch = window.fetch;

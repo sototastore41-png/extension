@@ -1645,49 +1645,34 @@ function setupSend(){
       btn.classList.add("ql-sending");
       btn.disabled = true;
 
-      // Inject directly into Lovable's chat input and auto-send
-      var chatForm = document.querySelector("form#chat-input");
-      if (!chatForm) {
-        throw new Error("Lovable chat form not found. Open Lovable project.");
-      }
+      // Send via page hook (runs in page context, can interact with Lovable UI)
+      await new Promise((resolve, reject) => {
+        let responded = false;
+        const timeout = setTimeout(() => {
+          if (!responded) {
+            responded = true;
+            reject(new Error("Message send timeout"));
+          }
+        }, 3000);
 
-      var editor = chatForm.querySelector('[contenteditable="true"]');
-      if (!editor) {
-        throw new Error("Chat input editor not found.");
-      }
-
-      // Set message text
-      editor.innerText = finalMensagem;
-      editor.dispatchEvent(new Event("input", { bubbles: true }));
-
-      // Handle plan mode toggle if needed
-      if (modoPlano) {
-        var planItems = document.querySelectorAll('[role="menuitemradio"]');
-        for (var pi = 0; pi < planItems.length; pi++) {
-          var item = planItems[pi];
-          var txt = (item.textContent || "").trim();
-          if (/^Plan(\s|$)/i.test(txt) || /Discuss before building/i.test(txt)) {
-            var state = item.getAttribute('data-state') || item.getAttribute('aria-checked');
-            if (state !== 'checked' && state !== 'true') {
-              item.click();
-              await new Promise(r => setTimeout(r, 200));
+        function handleResponse(event) {
+          if (event.data && event.data.type === "techvaiSendResponse") {
+            if (!responded) {
+              responded = true;
+              clearTimeout(timeout);
+              window.removeEventListener("message", handleResponse);
+              if (event.data.success) {
+                resolve(event.data);
+              } else {
+                reject(new Error(event.data.error || "Message send failed"));
+              }
             }
           }
         }
-      }
 
-      // Find and click the send button
-      var sendBtn = chatForm.querySelector('button[type="submit"], button[aria-label*="Send" i], button[title*="Send" i]');
-      if (!sendBtn) {
-        // Try direct ID lookup
-        sendBtn = document.getElementById("chatinput-send-message-button");
-      }
-      if (!sendBtn) {
-        throw new Error("Send button not found.");
-      }
-
-      // Simulate user click on send button
-      sendBtn.click();
+        window.addEventListener("message", handleResponse);
+        window.postMessage({ type: "techvaiSendMessage", message: finalMensagem }, "*");
+      });
 
       var result = { success: true };
 
@@ -2241,10 +2226,34 @@ async function sendViaNativeChat(text, editor) {
   try {
     const planActive = detectLovableNativePlan();
 
-    var messagePayload = {
-      message: text,
-      mode: planActive ? "discuss" : "build"
-    };
+    // Send via page hook
+    await new Promise((resolve, reject) => {
+      let responded = false;
+      const timeout = setTimeout(() => {
+        if (!responded) {
+          responded = true;
+          reject(new Error("Message send timeout"));
+        }
+      }, 3000);
+
+      function handleResponse(event) {
+        if (event.data && event.data.type === "techvaiSendResponse") {
+          if (!responded) {
+            responded = true;
+            clearTimeout(timeout);
+            window.removeEventListener("message", handleResponse);
+            if (event.data.success) {
+              resolve(event.data);
+            } else {
+              reject(new Error(event.data.error || "Message send failed"));
+            }
+          }
+        }
+      }
+
+      window.addEventListener("message", handleResponse);
+      window.postMessage({ type: "techvaiSendMessage", message: text }, "*");
+    });
 
     var result = { success: true };
 
